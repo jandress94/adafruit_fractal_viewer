@@ -5,7 +5,7 @@ import adafruit_touchscreen
 import displayio
 import gc
 import board
-from fractals import LinearColorMapper, FractalViewer, Complex
+from fractals import LinearColorMapper, FractalViewer, Complex, mandelbrot_fractal, burning_ship_fractal
 
 touchscreen = adafruit_touchscreen.Touchscreen(board.TOUCH_XL, board.TOUCH_XR,
                                                             board.TOUCH_YD, board.TOUCH_YU,
@@ -109,8 +109,9 @@ def rgb_to_int(r, g, b):
 
 colors = [rgb_to_int(*c) for c in colors]
 
+fractal = burning_ship_fractal
 color_mapper = LinearColorMapper(colors)
-fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=(320, 240))
+fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=(320, 240), fractal=fractal)
 
 while True:
     set_background(fractal_viewer.bitmap, color_mapper.palette)
@@ -128,4 +129,5 @@ while True:
     
     fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=fractal_viewer.pix_sz, 
         cmp_bounds=((touch_cmp.r - cmp_bounds_x_rng, touch_cmp.r + cmp_bounds_x_rng), 
-                    (touch_cmp.c - cmp_bounds_y_rng, touch_cmp.c + cmp_bounds_y_rng)))
+                    (touch_cmp.c - cmp_bounds_y_rng, touch_cmp.c + cmp_bounds_y_rng)), 
+        fractal=fractal)

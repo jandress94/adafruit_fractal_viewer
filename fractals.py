@@ -2,7 +2,13 @@ from displayio import Bitmap, Palette
 from math import sqrt
 
 
-def mandelbrot(c, max_iter):
+class Fractal:
+    def __init__(self, fractal_fn, starting_cmp_bounds):
+        self.fractal_fn = fractal_fn
+        self.starting_cmp_bounds = starting_cmp_bounds
+    
+
+def mandelbrot_fn(c, max_iter):
     z = c
     n = 0
     while z.modulus() <= 2 and n < max_iter:
@@ -10,6 +16,19 @@ def mandelbrot(c, max_iter):
         n += 1
     return n
 
+
+def burning_ship_fn(c, max_iter):
+    z = c
+    n = 0
+    while z.modulus() <= 2 and n < max_iter:
+        z_abs = Complex(abs(z.r), abs(z.c))
+        z = z_abs * z_abs + c
+        n += 1
+    return n
+
+
+mandelbrot_fractal = Fractal(mandelbrot_fn, ((-2.4, 1.2), (-1.2, 1.2)))
+burning_ship_fractal = Fractal(burning_ship_fn, ((-2.1, 1.5), (-1.8, 0.6)))
 
 class Complex:
     def __init__(self, r, c):
@@ -31,9 +50,9 @@ class Complex:
 
 
 class FractalViewer:
-    def __init__(self, color_mapper, max_iter, fractal_fn=mandelbrot, pix_sz=(320, 240), cmp_bounds=((-2.4, 1.2), (-1.2, 1.2))):
+    def __init__(self, color_mapper, max_iter, fractal=mandelbrot_fractal, pix_sz=(320, 240), cmp_bounds=None):
         self.color_mapper = color_mapper
-        self.fractal_fn = fractal_fn
+        self.fractal_fn = fractal.fractal_fn
 
         if pix_sz[0] % 2 == 0:
             pix_sz = (pix_sz[0]-1, pix_sz[1])
@@ -41,7 +60,7 @@ class FractalViewer:
             pix_sz = (pix_sz[0], pix_sz[1]-1)
         self.pix_sz = pix_sz
 
-        self.cmp_bounds = cmp_bounds
+        self.cmp_bounds = cmp_bounds if cmp_bounds is not None else fractal.starting_cmp_bounds
         self.max_iter = max_iter
         self.current_step = 0
         self.current_col = 0
