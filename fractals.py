@@ -28,7 +28,7 @@ def burning_ship_fn(c, max_iter):
 
 
 mandelbrot_fractal = Fractal(mandelbrot_fn, ((-2.4, 1.2), (-1.2, 1.2)))
-burning_ship_fractal = Fractal(burning_ship_fn, ((-2.1, 1.5), (-1.8, 0.6)))
+burning_ship_fractal = Fractal(burning_ship_fn, ((-2.2, 1.4), (-1.8, 0.6)))
 
 class Complex:
     def __init__(self, r, c):
@@ -62,26 +62,50 @@ class FractalViewer:
 
         self.cmp_bounds = cmp_bounds if cmp_bounds is not None else fractal.starting_cmp_bounds
         self.max_iter = max_iter
-        self.current_step = 0
         self.current_col = 0
         self.bitmap = Bitmap(self.pix_sz[0], self.pix_sz[1], color_mapper.num_colors)
 
-    def pix_to_cmp(self, pix):
-        return Complex(self.cmp_bounds[0][0] + 1.*pix[0]*(self.cmp_bounds[0][1] - self.cmp_bounds[0][0]) / (self.pix_sz[0] - 1),
-                       self.cmp_bounds[1][0] + 1.*pix[1]*(self.cmp_bounds[1][1] - self.cmp_bounds[1][0]) / (self.pix_sz[1] - 1))
+    def pix_to_cmp(self, pix, fencepost_offset=-1):
+        return Complex(self.cmp_bounds[0][0] + 1.*pix[0]*(self.cmp_bounds[0][1] - self.cmp_bounds[0][0]) / (self.pix_sz[0] + fencepost_offset),
+                       self.cmp_bounds[1][0] + 1.*pix[1]*(self.cmp_bounds[1][1] - self.cmp_bounds[1][0]) / (self.pix_sz[1] + fencepost_offset))
 
     def has_computation_left(self):
         return self.current_col != self.pix_sz[0]
 
-
     def step(self):
-        next_step = 1 + self.current_step
         x = self.current_col
         for y in range(self.pix_sz[1]):
             fractal_iter_cnt = self.fractal_fn(self.pix_to_cmp((x, y)), self.max_iter-1)
             self.bitmap[x, y] = self.color_mapper.disp_pt_to_color_ind(fractal_iter_cnt)
         self.current_col = self.current_col + 1
+
+    def register_click(self, click_pt):
+        half_screen_w = (self.pix_sz[0] + 1) // 2
+        half_screen_h = (self.pix_sz[1] + 1) // 2
+
+        click_base_x = click_pt[0] - half_screen_w // 2
+        click_base_x = max(0, min(click_base_x, half_screen_w - 1))
+        click_base_y = click_pt[1] - half_screen_h // 2
+        click_base_y = max(0, min(click_base_y, half_screen_h - 1))
+
+        click_pt = (click_base_x, click_base_y)
+        end_pix_pt = (click_pt[0] + half_screen_w, click_pt[1] + half_screen_h)
         
+        start_cmp = self.pix_to_cmp(click_pt)
+        end_cmp = self.pix_to_cmp(end_pix_pt, fencepost_offset=0)
+
+        self.cmp_bounds = ((start_cmp.r, end_cmp.r), (start_cmp.c, end_cmp.c))
+        biggest_pt = (self.pix_sz[0] - 1, self.pix_sz[1] - 1)
+
+        self.current_col = 0
+
+        new_bitmap = Bitmap(self.pix_sz[0], self.pix_sz[1], self.color_mapper.num_colors)
+
+        for x in range(self.pix_sz[0]):
+            for y in range(self.pix_sz[1]):
+                new_bitmap[x, y] = self.bitmap[x // 2 + click_pt[0], y // 2 + click_pt[1]]
+        self.bitmap = new_bitmap
+
 
 class LinearColorMapper:
     def __init__(self, color_list, iter_step_size=1):

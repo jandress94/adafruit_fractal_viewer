@@ -109,9 +109,10 @@ def rgb_to_int(r, g, b):
 
 colors = [rgb_to_int(*c) for c in colors]
 
-fractal = burning_ship_fractal
+# fractal = burning_ship_fractal
+fractal = mandelbrot_fractal
 color_mapper = LinearColorMapper(colors)
-fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=(320, 240), fractal=fractal)
+fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=(120, 90), fractal=fractal)
 
 while True:
     set_background(fractal_viewer.bitmap, color_mapper.palette)
@@ -121,13 +122,16 @@ while True:
 
     touch_x, touch_y, _ = wait_for_touch(touchscreen)
 
-    touch_cmp = fractal_viewer.pix_to_cmp((touch_x, touch_y))
-    cmp_bounds_x, cmp_bounds_y = fractal_viewer.cmp_bounds
+    # touch_cmp = fractal_viewer.pix_to_cmp((touch_x, touch_y))
+    # cmp_bounds_x, cmp_bounds_y = fractal_viewer.cmp_bounds
 
-    cmp_bounds_x_rng = (cmp_bounds_x[1] - cmp_bounds_x[0]) / 4
-    cmp_bounds_y_rng = (cmp_bounds_y[1] - cmp_bounds_y[0]) / 4
+    # cmp_bounds_x_rng = (cmp_bounds_x[1] - cmp_bounds_x[0]) / 4
+    # cmp_bounds_y_rng = (cmp_bounds_y[1] - cmp_bounds_y[0]) / 4
     
-    fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=fractal_viewer.pix_sz, 
-        cmp_bounds=((touch_cmp.r - cmp_bounds_x_rng, touch_cmp.r + cmp_bounds_x_rng), 
-                    (touch_cmp.c - cmp_bounds_y_rng, touch_cmp.c + cmp_bounds_y_rng)), 
-        fractal=fractal)
+    # fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=fractal_viewer.pix_sz, 
+    #     cmp_bounds=((touch_cmp.r - cmp_bounds_x_rng, touch_cmp.r + cmp_bounds_x_rng), 
+    #                 (touch_cmp.c - cmp_bounds_y_rng, touch_cmp.c + cmp_bounds_y_rng)), 
+    #     fractal=fractal)
+
+    fractal_viewer.register_click((touch_x, touch_y))
+
