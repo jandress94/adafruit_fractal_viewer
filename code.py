@@ -1,37 +1,69 @@
-import time
-import board
-# from my_pyportal import PyPortal
+
 import adafruit_touchscreen
 import displayio
 import gc
 import board
-from fractals import LinearColorMapper, FractalViewer, Complex, mandelbrot_fractal, burning_ship_fractal
+from adafruit_button import Button
+from adafruit_bitmap_font import bitmap_font
+from adafruit_display_text.label import Label
+from fractals import LinearColorMapper, FractalViewer, mandelbrot_fractal, burning_ship_fractal
+
+cwd = ("/"+__file__).rsplit('/', 1)[0]
+
+screen_size = (320, 240)
+button_area_size = (100, screen_size[1])
+fractal_area_size = (screen_size[0] - button_area_size[0], screen_size[1])
+fractal_position = (button_area_size[0], 0)
 
 touchscreen = adafruit_touchscreen.Touchscreen(board.TOUCH_XL, board.TOUCH_XR,
                                                             board.TOUCH_YD, board.TOUCH_YU,
                                                             calibration=((5200, 59000),
                                                                          (5800, 57000)),
-                                                            size=(320, 240))
+                                                            size=screen_size)
 splash = displayio.Group(max_size=15)
 _bg_group = displayio.Group(max_size=1)
-_bg_file = None
 _default_bg = 0x000000
 splash.append(_bg_group)
-
 board.DISPLAY.show(splash)
 
-# the current working directory (where this file is)
-cwd = ("/"+__file__).rsplit('/', 1)[0]
-# pyportal = PyPortal(status_neopixel=board.NEOPIXEL,
-#                     debug=True)
+font = bitmap_font.load_font(cwd+"/fonts/Arial-ItalicMT-17.bdf")
+
+# setup the UI Elements
+mandelbrot_button = Button(x=10, y=10, width=80, height=80, 
+    style=Button.SHADOWROUNDRECT, fill_color=(255, 255, 255), 
+    outline_color=0x222222, name="mandelbrot", label="Mandel...", label_font=font, selected_fill=(100, 100, 100))
+
+ship_button = Button(x=10, y=100, width=80, height=80, 
+    style=Button.SHADOWROUNDRECT, fill_color=(255, 255, 255), 
+    outline_color=0x222222, name="ship", label="Ship", label_font=font, selected_fill=(100, 100, 100))
+
+zoom_label = Label(font, text="Touch To\nZoom ->", line_spacing=1.1)
+zoom_label.y = 210
+zoom_label.x = 10
+zoom_label.color = 0x000000
+
+
+def flip_buttons(enabled):
+    if enabled:
+        mandelbrot_button.selected = False
+        ship_button.selected = False
+        zoom_label.color = 0xffffff
+    else:
+        mandelbrot_button.selected = True
+        ship_button.selected = True
+        zoom_label.color = 0x000000
+
+
+def get_fractal_from_touch(touch_x, touch_y):
+    if mandelbrot_button.contains((touch_x, touch_y)):
+        return mandelbrot_fractal
+    elif ship_button.contains((touch_x, touch_y)):
+        return burning_ship_fractal
+    else:
+        return None
 
 
 def set_background(bitmap, color_palette, position=None):
-    """The background image to a bitmap file.
-    :param file_or_color: The filename of the chosen background image, or a hex color.
-    """
-    global _bg_file
-    print("Set background to ", bitmap)
     while _bg_group:
         _bg_group.pop()
 
@@ -40,13 +72,11 @@ def set_background(bitmap, color_palette, position=None):
 
     if not bitmap:
         return  # we're done, no background desired
-    if _bg_file:
-        _bg_file.close()
 
     try:
         _bg_sprite = displayio.TileGrid(bitmap,
                                              pixel_shader=color_palette,
-                                             position=(0, 0))
+                                             position=position)
     except TypeError:
         _bg_sprite = displayio.TileGrid(bitmap,
                                              pixel_shader=color_palette,
@@ -78,6 +108,10 @@ def get_next_color(r, g, b, step=5):
     return clip(r), clip(g), clip(b)
 
 
+def rgb_to_int(r, g, b):
+    return r * 256 ** 2 + g * 256 + b
+
+
 def wait_for_touch(touchscreen, min_pts=15):
     max_len = 10 * min_pts
 
@@ -96,42 +130,52 @@ def wait_for_touch(touchscreen, min_pts=15):
             pts = []
 
 
-max_iter = 16
-num_colors_to_use = 16
+if __name__ == '__main__':
+    splash.append(mandelbrot_button.group)
+    splash.append(ship_button.group)
+    splash.append(zoom_label)
 
-colors = [(255, 0, 0)]
+    # get the original fractal selection
+    fractal = None
+    while fractal is None:
+        touch_x, touch_y, _ = wait_for_touch(touchscreen)
+        fractal = get_fractal_from_touch(touch_x, touch_y)
 
-while len(colors) < num_colors_to_use:
-	colors.append(get_next_color(*colors[-1], step=75))
+    # disable the buttons
+    flip_buttons(enabled=False)
 
-def rgb_to_int(r, g, b):
-	return r * 256 ** 2 + g * 256 + b
+    # create the colors that will be used to display the fractal
+    num_colors_to_use = 16
+    colors = [(255, 0, 0)]
+    while len(colors) < num_colors_to_use:
+        colors.append(get_next_color(*colors[-1], step=75))
+    colors = [rgb_to_int(*c) for c in colors]
+    color_mapper = LinearColorMapper(colors)
 
-colors = [rgb_to_int(*c) for c in colors]
+    # create the fractal viewer
+    max_iter = 16
+    fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=fractal_area_size, fractal=fractal)
 
-# fractal = burning_ship_fractal
-fractal = mandelbrot_fractal
-color_mapper = LinearColorMapper(colors)
-fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=(120, 90), fractal=fractal)
+    while True:
+        set_background(fractal_viewer.bitmap, color_mapper.palette, position=fractal_position)
+        
+        # keep rendering the fractal until it is done
+        while fractal_viewer.has_computation_left():
+            fractal_viewer.step()
+            set_background(fractal_viewer.bitmap, color_mapper.palette, position=fractal_position)
 
-while True:
-    set_background(fractal_viewer.bitmap, color_mapper.palette)
-    while fractal_viewer.has_computation_left():
-        fractal_viewer.step()
-        set_background(fractal_viewer.bitmap, color_mapper.palette)
+        # enable the buttons
+        flip_buttons(enabled=True)
 
-    touch_x, touch_y, _ = wait_for_touch(touchscreen)
+        # get the touch point
+        touch_x, touch_y, _ = wait_for_touch(touchscreen)
 
-    # touch_cmp = fractal_viewer.pix_to_cmp((touch_x, touch_y))
-    # cmp_bounds_x, cmp_bounds_y = fractal_viewer.cmp_bounds
-
-    # cmp_bounds_x_rng = (cmp_bounds_x[1] - cmp_bounds_x[0]) / 4
-    # cmp_bounds_y_rng = (cmp_bounds_y[1] - cmp_bounds_y[0]) / 4
-    
-    # fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=fractal_viewer.pix_sz, 
-    #     cmp_bounds=((touch_cmp.r - cmp_bounds_x_rng, touch_cmp.r + cmp_bounds_x_rng), 
-    #                 (touch_cmp.c - cmp_bounds_y_rng, touch_cmp.c + cmp_bounds_y_rng)), 
-    #     fractal=fractal)
-
-    fractal_viewer.register_click((touch_x, touch_y))
-
+        new_fractal = get_fractal_from_touch(touch_x, touch_y)
+        if new_fractal is not None:
+            # if they selected one of the fractal buttons, restart with that fractal
+            flip_buttons(enabled=False)
+            fractal_viewer = FractalViewer(color_mapper, max_iter, pix_sz=fractal_area_size, fractal=new_fractal)
+        elif touch_x >= fractal_position[0]:
+            # if they clicked within the fractal, zoom
+            flip_buttons(enabled=False)
+            fractal_viewer.register_click((touch_x - fractal_position[0], touch_y))
